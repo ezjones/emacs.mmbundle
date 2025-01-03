@@ -4,32 +4,79 @@
 # Based on the Atom, MacVim and TextMate bundles 
 ##
 
+# If you have a custom server name in Emacs, set this environment variable
+# EMACS_SERVER_FILE=/path/to/your/custom/server/socket
+
 PATH=$HOME/bin:~/Applications/Emacs.app/Contents/MacOS/bin:/Applications/Emacs.app/Contents/MacOS/bin:~/Applications/Emacs.app/Contents/MacOS:/Applications/Emacs.app/Contents/MacOS:/usr/local/bin:$PATH
 
 cpath=$(which emacsclient)
 epath=$(which emacs)
 
-if [ ! -f "$(which lsof)" ]; then
-    osascript -e 'tell application "System Events" to display dialog "Make sure you have `lsof` installed on your system." buttons "OK" default button 1 with title "Unable to locate system utility"' >/dev/null 2>&1 &
-elif [ ! -f "$cpath" ]; then
-    osascript -e 'tell application "System Events" to display dialog "Make sure you have Emacs for Mac installed on your system, go to emacsformacosx.com" buttons "OK" default button 1 with title "Unable to locate Emacs"' >/dev/null 2>&1 &
-else
-    socket_file=$(lsof -c Emacs | grep server | tr -s " " | cut -d' ' -f8)
+# Debug logging
+log_file="/tmp/mailmate-emacs.log"
+echo "Starting edit script at $(date)" > "$log_file"
+echo "Environment variables:" >> "$log_file"
+env | sort >> "$log_file"
+echo "Emacsclient path: $cpath" >> "$log_file"
+echo "---" >> "$log_file"
 
-    if [[ $socket_file == "" ]]; then
-        osascript -e "display notification \"This might take a couple of seconds, be patient...\" with title \"MailMate Editor\" subtitle \"Starting Emacs as a --daemon\""
-        # Tricking Emacs into thinking a tty is available
-        export TERM=xterm-color
-        script -q /dev/null "$epath" --daemon 1>/dev/null 2>&1
-        socket_file=$(lsof -c Emacs | grep server | tr -s " " | cut -d' ' -f8)
-    fi
-
-    if [[ $socket_file == "" ]]; then
-        osascript -e 'tell application "System Events" to display dialog "Start Emacs as a server (start-server) or as a --daemon" buttons "OK" default button 1 with title "Unable to locate Emacs server"' >/dev/null 2>&1
-    else
-        client="$cpath -c -s \"$socket_file\""
-        eval $client +$MM_LINE_NUMBER "$MM_EDIT_FILEPATH"
-    fi
-
-    osascript -e 'tell app "MailMate" to activate'
+if [ -z "$MM_EDIT_FILEPATH" ]; then
+    osascript -e 'tell application "System Events" to display dialog "MM_EDIT_FILEPATH is not set." buttons "OK" default button 1 with title "Configuration Error"' >/dev/null 2>&1
+    exit 1
 fi
+
+# Create a temporary directory in home if it doesn't exist
+temp_dir="$HOME/.mailmate-temp"
+mkdir -p "$temp_dir"
+
+# Copy the file to home directory with a unique name
+temp_file="$temp_dir/mailmate-edit-$(date +%s).txt"
+cp "$MM_EDIT_FILEPATH" "$temp_file"
+chmod 644 "$temp_file"
+
+echo "Original file: $MM_EDIT_FILEPATH" >> "$log_file"
+echo "Temp file: $temp_file" >> "$log_file"
+echo "File contents:" >> "$log_file"
+cat "$temp_file" >> "$log_file"
+echo "---" >> "$log_file"
+
+# Test server connection
+echo "Testing server connection..." >> "$log_file"
+server_test=$("$cpath" -e "(message \"Server test\")" 2>&1)
+echo "Server test result: $server_test" >> "$log_file"
+
+# Try to open the file
+echo "Attempting to open file..." >> "$log_file"
+result=$("$cpath" -n -c "$temp_file" 2>&1)
+status=$?
+
+echo "Command result (status=$status): $result" >> "$log_file"
+
+if [ $status -eq 0 ]; then
+    echo "Command appeared successful" >> "$log_file"
+    # Activate Emacs and stay there
+    osascript -e 'tell application "Emacs" to activate' >/dev/null 2>&1
+    
+    # Set up file watcher in the background
+    (
+        while true; do
+            if [ -f "$temp_file" ]; then
+                cp "$temp_file" "$MM_EDIT_FILEPATH"
+                sleep 1
+            else
+                break
+            fi
+        done
+    ) &
+else
+    echo "Command failed" >> "$log_file"
+    osascript -e "display notification \"Failed to open file in Emacs (status=$status): $result\" with title \"MailMate Editor Error\"" >/dev/null 2>&1
+fi
+
+# Additional debugging info
+echo "Final checks:" >> "$log_file"
+echo "Temp file exists: $([ -f "$temp_file" ] && echo "yes" || echo "no")" >> "$log_file"
+echo "Temp file permissions: $(ls -l "$temp_file")" >> "$log_file"
+echo "Emacs server status: $("$cpath" -e '(server-running-p)' 2>&1)" >> "$log_file"
+
+exit $status
