@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>contactName</key>
-	<string>Alexandru Nedelcu</string>
+	<string>Alexandru Nedelcu & Ez Jones</string>
 	<key>description</key>
 	<string>Emacs editor integration.</string>
 	<key>name</key>

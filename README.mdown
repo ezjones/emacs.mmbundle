@@ -1,12 +1,8 @@
-# Emacs integration with MailMate
+# MailMate Emacs Bundle
 
-MailMate bundle allowing the usage of Emacs as a text editor for
-composing emails.
+Fork of  https://github.com/alexandru/emacs.mmbundle
 
-While composing an email the action is available as:
-
-- Menu Item: Command → Emacs → Edit
-- Keyboard shortcut: Ctrl+Shift+O
+This version supports custom emacs server names and saves temporary files to ~/.mailmate-temp to avoid permission issues.
 
 ## Installation
 
@@ -16,21 +12,31 @@ install it manually like this:
 ```
 mkdir -p ~/Library/Application\ Support/MailMate/Bundles 
 cd ~/Library/Application\ Support/MailMate/Bundles 
-git clone https://github.com/alexandru/emacs.mmbundle
-```
+git clone https://github.com/ezjones/emacs.mmbundle
 
-# License
+## Setup
 
-If not otherwise specified (see below), files in this repository fall
-under the following license:
+1. Make sure Emacs is installed and in your PATH
+2. Ensure the Emacs server is running (`M-x server-start` in Emacs)
+3. If you use a custom server name or socket location:
+   - Set `EMACS_SERVER_FILE` environment variable to point to your server socket
+   - Or use `server-start` with your custom name in Emacs
 
-	Permission to copy, use, modify, sell and distribute this
-	software is granted. This software is provided "as is" without
-	express or implied warranty, and with no claim as to its
-	suitability for any purpose.
+## Troubleshooting
 
-An exception is made for files in readable text which contain their
-own license information, or files where an accompanying file exists
-(in the same directory) with a “-license” suffix added to the
-base-name name of the original file, and an extension of txt, html, or
-similar.
+If the editor isn't opening:
+1. Check if Emacs server is running with `M-x server-running-p`
+2. Verify your server socket location (default is `~/.emacs.d/server/server`)
+3. Check the logs at `/tmp/mailmate-emacs.log`
+
+## Configuration
+
+The bundle uses these environment variables:
+- `EMACS_SERVER_FILE`: Custom server socket location (optional)
+- `PATH`: Should include path to `emacsclient`
+
+## Notes
+
+- Files are temporarily copied to `~/.mailmate-temp/` for editing
+- Changes are automatically synced back to MailMate
+- The script uses `emacsclient` to connect to an existing Emacs instance
